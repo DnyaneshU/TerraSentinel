@@ -53,6 +53,65 @@ as ground truth. The model is instructed to build on them, may add issues it can
 justify from the code, and must not invent resources or line numbers. That keeps
 the AI accurate — the usual failure mode of "AI code review" tools.
 
+## Demo
+
+### Run it locally in seconds — no API key required
+
+```bash
+terrasentinel examples/insecure --scan-only
+```
+
+```text
+Static findings (32)  —  examples/insecure/main.tf
+
+ CKV_AWS_24    SSH ingress open to 0.0.0.0/0                    main.tf:29
+ CKV_AWS_17    RDS instance is publicly accessible              main.tf:50
+ CKV_AWS_16    RDS storage is not encrypted at rest             main.tf:50
+ CKV_AWS_20    S3 bucket ACL allows public READ access          main.tf:18
+ CKV_AWS_62    IAM policy allows full "*:*" admin privileges    main.tf:63
+ … 27 more
+```
+
+`--scan-only` reports the raw scanner facts. The full AI review below adds the
+severity, cost, and fixes on top.
+
+### The review comment it posts on a pull request
+
+With `ANTHROPIC_API_KEY` set, TerraSentinel posts a single, self-updating comment
+like this (illustrative):
+
+> ## 🛡️ TerraSentinel review
+> **Verdict:** ⛔ Request changes &nbsp;·&nbsp; **Risk score:** 88/100 🟥🟥🟥🟥🟥🟥🟥🟥🟥⬜
+>
+> This change provisions a publicly accessible, unencrypted RDS database with a
+> hard-coded password, opens SSH to the entire internet, and grants `*:*` IAM
+> permissions. Several critical, internet-facing exposures.
+>
+> **💰 Cost impact:** ~$2,800/month — `db.m5.4xlarge` with 500 GB is heavily
+> oversized for a typical app database; a `db.t3.large` would cover most workloads.
+>
+> | Severity | Title | Location | Category |
+> |---|---|---|---|
+> | 🛑 critical | Hard-coded database password | `main.tf:50` | security |
+> | 🔴 high | SSH open to 0.0.0.0/0 | `main.tf:29` | security |
+> | 🔴 high | RDS publicly accessible & unencrypted | `main.tf:50` | security |
+> | 🟠 medium | Oversized RDS instance | `main.tf:50` | cost |
+>
+> **🔴 SSH open to 0.0.0.0/0** — `main.tf:29`
+> *Why it matters:* anyone on the internet can reach port 22 and brute-force credentials.
+> *Suggested fix:*
+> ```hcl
+> ingress {
+>   from_port   = 22
+>   to_port     = 22
+>   protocol    = "tcp"
+>   cidr_blocks = ["10.0.0.0/8"] # restrict to your private network
+> }
+> ```
+
+> 📸 **Tip:** once you run it on a real PR, drop a screenshot at `docs/demo.png`
+> and embed it here: `![TerraSentinel review comment](docs/demo.png)`
+
 ## Features
 
 - 🔎 **Static-analysis grounding** — auto-detects `checkov` or `tfsec`; degrades to
@@ -127,8 +186,10 @@ terrasentinel ./infra --format markdown --fail-on high
 
 ## Use it in CI (GitHub Action)
 
-Add `ANTHROPIC_API_KEY` to your repo secrets, then drop this workflow in
-`.github/workflows/terrasentinel.yml`:
+Add TerraSentinel to any Terraform repository in **3 steps**:
+
+1. **Add your key** — repo **Settings → Secrets and variables → Actions → New repository secret**, named `ANTHROPIC_API_KEY`. *(Or skip the key and set `scan-only: "true"` below to run checkov-only.)*
+2. **Add the workflow** — create `.github/workflows/terrasentinel.yml`:
 
 ```yaml
 name: TerraSentinel review
@@ -151,7 +212,7 @@ jobs:
           # scan-only: "true"   # run with no API key (static analysis only)
 ```
 
-The action installs checkov, runs the review on the PR diff, and posts the comment.
+3. **Open a PR** that changes a `.tf` file — the action installs checkov, reviews the diff, and posts a single self-updating comment automatically.
 
 ## Configuration
 
