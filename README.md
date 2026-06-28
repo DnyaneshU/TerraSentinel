@@ -144,7 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: your-username/terrasentinel@v1
+      - uses: DnyaneshU/TerraSentinel@v1
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           fail-on: high

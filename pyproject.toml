@@ -40,8 +40,8 @@ dev = ["pytest>=8", "ruff>=0.6"]
 terrasentinel = "terrasentinel.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/terrasentinel"
-Issues = "https://github.com/your-username/terrasentinel/issues"
+Homepage = "https://github.com/DnyaneshU/TerraSentinel"
+Issues = "https://github.com/DnyaneshU/TerraSentinel/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/terrasentinel"]

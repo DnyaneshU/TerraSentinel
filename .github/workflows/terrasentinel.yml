@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0 # full history so the diff against the base branch works
 
       # Uses the action from this repository. When you publish it, replace `./`
-      # with `your-username/terrasentinel@v1`.
+      # with `DnyaneshU/TerraSentinel@v1`.
       - uses: ./
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
