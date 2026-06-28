@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets / local config
+.env
+*.local
+
+# Terraform (in case you test against real infra dirs)
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

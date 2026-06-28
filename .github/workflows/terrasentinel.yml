@@ -1,0 +1,29 @@
+name: TerraSentinel review
+
+# Reviews Terraform changes on every pull request and posts a single, self-updating
+# comment with security findings, cost impact, and suggested fixes.
+
+on:
+  pull_request:
+    paths:
+      - "**/*.tf"
+
+permissions:
+  contents: read
+  pull-requests: write # required to post the review comment
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the diff against the base branch works
+
+      # Uses the action from this repository. When you publish it, replace `./`
+      # with `your-username/terrasentinel@v1`.
+      - uses: ./
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          fail-on: high
+          # scan-only: "true"   # uncomment to run without an API key (static analysis only)

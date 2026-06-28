@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "terrasentinel"
+version = "0.1.0"
+description = "AI-powered Infrastructure-as-Code pull-request reviewer: grounds an LLM with static analysis to explain security risks, estimate cost impact, and suggest fixes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Dnyanesh Ujalambkar" }]
+keywords = ["terraform", "iac", "security", "devsecops", "ai", "claude", "code-review", "finops"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+# Core dependencies are all pure-Python and install cleanly on any modern Python.
+# The static scanner (checkov / tfsec) is intentionally NOT a hard dependency:
+# it is auto-detected as an external command so this package installs everywhere,
+# including Python versions a heavyweight scanner has not yet caught up to.
+dependencies = [
+    "anthropic>=0.40",
+    "requests>=2.31",
+    "rich>=13.7",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Convenience extra for users who want to pip-install checkov into the same
+# environment. On bleeding-edge Python this may fail to build — in that case
+# install checkov separately (pipx / Docker) or rely on AI-only mode.
+scan = ["checkov>=3,<4"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+terrasentinel = "terrasentinel.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-username/terrasentinel"
+Issues = "https://github.com/your-username/terrasentinel/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/terrasentinel"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

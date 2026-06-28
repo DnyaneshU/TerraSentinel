@@ -1,0 +1,64 @@
+name: "TerraSentinel"
+description: "AI-powered Terraform/IaC pull-request reviewer — security, cost, and fixes."
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  anthropic-api-key:
+    description: "Anthropic API key. Omit and set scan-only=true for static-analysis-only mode."
+    required: false
+    default: ""
+  github-token:
+    description: "Token used to post the PR comment."
+    required: true
+    default: ${{ github.token }}
+  model:
+    description: "Claude model id."
+    required: false
+    default: "claude-opus-4-8"
+  fail-on:
+    description: "Fail the job if findings reach this severity (critical|high|medium|low|none)."
+    required: false
+    default: "high"
+  scan-only:
+    description: "Run static analysis only (no AI, no API key needed)."
+    required: false
+    default: "false"
+  base-ref:
+    description: "Base git ref for the diff. Defaults to the PR base branch."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install TerraSentinel + checkov
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install checkov
+        pip install "${{ github.action_path }}"
+
+    - name: Run review
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TS_MODEL: ${{ inputs.model }}
+        TS_FAIL_ON: ${{ inputs.fail-on }}
+        TS_SCAN_ONLY: ${{ inputs.scan-only }}
+        TS_BASE_REF: ${{ inputs.base-ref }}
+      run: |
+        set -euo pipefail
+        args=(--diff --post-pr --fail-on "$TS_FAIL_ON" --model "$TS_MODEL")
+        if [ "$TS_SCAN_ONLY" = "true" ]; then args+=(--scan-only); fi
+        base="$TS_BASE_REF"
+        if [ -z "$base" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then base="origin/$GITHUB_BASE_REF"; fi
+        if [ -n "$base" ]; then args+=(--base "$base"); fi
+        terrasentinel "${args[@]}"
