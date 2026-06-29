@@ -46,6 +46,36 @@ def git_diff(base: str, head: str = "HEAD", files: list[str] | None = None) -> s
     return _git(args).stdout
 
 
+GUARDRAILS_FILENAMES = ("guardrails.md", ".terrasentinel/guardrails.md")
+
+
+def load_guardrails(target: str | Path, explicit: str | None = None) -> tuple[str | None, str | None]:
+    """Find and read the plain-English guardrails file.
+
+    Returns (path, text). Looks at an explicit path first, then conventional
+    locations relative to the target and the current directory.
+    """
+    candidates: list[Path] = []
+    if explicit:
+        candidates.append(Path(explicit))
+    base = Path(target)
+    search_dirs = [base if base.is_dir() else base.parent, Path(".")]
+    for d in search_dirs:
+        for name in GUARDRAILS_FILENAMES:
+            candidates.append(d / name)
+
+    seen: set[Path] = set()
+    for c in candidates:
+        if c in seen:
+            continue
+        seen.add(c)
+        if c.is_file():
+            text = c.read_text(encoding="utf-8", errors="replace").strip()
+            if text:
+                return str(c).replace("\\", "/"), text
+    return None, None
+
+
 def resolve_base_ref(explicit: str | None) -> str:
     """Pick a sensible base ref: explicit > origin/main > origin/master > main > HEAD~1."""
     if explicit:

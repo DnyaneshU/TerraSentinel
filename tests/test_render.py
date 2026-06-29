@@ -34,6 +34,40 @@ def test_review_markdown_contains_marker_and_fields():
     assert "main.tf:42" in md
 
 
+def test_review_markdown_shows_guardrail_and_verified_fix():
+    from types import SimpleNamespace
+
+    review = Review(
+        summary="Public DB exposed.",
+        risk_score=90,
+        verdict=Verdict.request_changes,
+        cost_impact="negligible",
+        findings=[
+            Finding(
+                title="RDS publicly accessible",
+                severity=Severity.high,
+                category="policy",
+                file="main.tf",
+                line=50,
+                explanation="DB reachable from the internet.",
+                blast_radius="Data exposure.",
+                recommendation="Set publicly_accessible = false.",
+                suggested_fix="publicly_accessible = false",
+                related_check_id="CKV_AWS_17",
+                guardrail="Databases must never be publicly accessible.",
+                fix_verified=True,
+            )
+        ],
+    )
+    verification = SimpleNamespace(resolved_count=3, before=5, introduced_count=0)
+    md = review_to_markdown(review, "checkov", verification)
+    assert "Verified fixes" in md
+    assert "resolved 3/5" in md
+    assert "Violates guardrail" in md
+    assert "verified" in md.lower()
+    assert "📜" in md  # guardrail marker on the finding title
+
+
 def test_static_markdown_handles_empty():
     md = static_findings_to_markdown([], "checkov")
     assert COMMENT_MARKER in md

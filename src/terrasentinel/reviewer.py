@@ -38,6 +38,15 @@ GROUNDING RULES — accuracy over volume:
 - If nothing is wrong, return an empty findings list, verdict 'approve', and a
   low risk score. Do not manufacture problems.
 
+TEAM GUARDRAILS:
+- You may be given a list of the team's own policies written in plain English
+  (security, cost, compliance, tagging, naming). Treat these as REQUIREMENTS for
+  this repository, on top of the scanner rules.
+- If the change violates a guardrail, emit a finding, set its "guardrail" field to
+  the exact guardrail text it breaks, and use category "policy" (or "cost" /
+  "compliance" if that fits better). Choose severity from the guardrail's intent.
+- Only flag a guardrail violation you can justify from the actual code/diff.
+
 Respond with ONLY a single JSON object (no prose, no markdown fences) matching:
 {
   "summary": "2-4 sentence overview of the change and its risk",
@@ -55,7 +64,8 @@ Respond with ONLY a single JSON object (no prose, no markdown fences) matching:
       "blast_radius": "what could go wrong / who is affected",
       "recommendation": "what to do",
       "suggested_fix": "corrected Terraform snippet or null",
-      "related_check_id": "scanner check id if applicable, else null"
+      "related_check_id": "scanner check id if applicable, else null",
+      "guardrail": "the exact team guardrail this violates, or null"
     }
   ]
 }
@@ -68,6 +78,7 @@ def review(
     diff_text: str | None,
     file_contents: dict[str, str],
     static_findings: list[StaticFinding],
+    guardrails: str | None = None,
 ) -> Review:
     if not settings.has_api_key:
         raise ReviewError(
@@ -81,7 +92,7 @@ def review(
         raise ReviewError("The 'anthropic' package is not installed.") from e
 
     client = anthropic.Anthropic(api_key=settings.api_key)
-    user_prompt = _build_prompt(diff_text, file_contents, static_findings)
+    user_prompt = _build_prompt(diff_text, file_contents, static_findings, guardrails)
     messages = [{"role": "user", "content": user_prompt}]
 
     last_error: str | None = None
@@ -126,8 +137,14 @@ def _build_prompt(
     diff_text: str | None,
     file_contents: dict[str, str],
     static_findings: list[StaticFinding],
+    guardrails: str | None = None,
 ) -> str:
     parts: list[str] = []
+
+    if guardrails:
+        parts.append("## Team guardrails (plain-English policy — enforce these)\n")
+        parts.append(guardrails.strip())
+        parts.append("")
 
     if static_findings:
         parts.append("## Static-analysis findings (ground truth)\n")

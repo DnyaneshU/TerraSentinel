@@ -4,7 +4,9 @@
 Terraform changes on every pull request and posts a single, self-updating comment
 that explains the **security risks**, estimates the **cost impact**, and gives the
 **exact fix** — grounded by a real static-analysis scanner so it cites genuine
-issues instead of hallucinating.
+issues instead of hallucinating. It goes beyond other reviewers in two ways: it
+enforces your **plain-English guardrails**, and it **verifies every fix by
+re-scanning** before suggesting it.
 
 > Static scanners tell you *what* rule failed. A human reviewer tells you *why it
 > matters here*, *what the blast radius is*, *what it costs*, and *how to fix it*.
@@ -52,6 +54,29 @@ reasons about the *specific change*.
 as ground truth. The model is instructed to build on them, may add issues it can
 justify from the code, and must not invent resources or line numbers. That keeps
 the AI accurate — the usual failure mode of "AI code review" tools.
+
+## What makes it different
+
+Most IaC reviewers stop at "here's what's wrong." TerraSentinel adds two things the
+others don't:
+
+### 📜 Guardrails in plain English
+Drop a `guardrails.md` in your repo and write your rules as sentences — *"No
+database may be public"*, *"≤ $1,000/month of new spend per PR"*, *"every resource
+needs an `Owner` tag"*. TerraSentinel enforces them on each PR **alongside** the
+scanner — no Rego, no Sentinel, no custom-policy code. See
+[`examples/guardrails.md`](examples/guardrails.md).
+
+### ✅ Verified fixes, not guesses
+Every other AI tool *suggests* a fix and hopes it's right. TerraSentinel applies the
+proposed fix to a throwaway copy, **re-runs the scanner**, and only labels it
+`✅ verified` if the finding is actually gone and nothing new broke. On the bundled
+example that's **25 of 32 findings resolved, 0 introduced** — proven, not promised.
+
+```bash
+terrasentinel ./infra --verify-fixes   # report verified fixes
+terrasentinel ./infra --fix            # also write the corrected files
+```
 
 ## Demo
 
@@ -116,6 +141,11 @@ like this (illustrative):
 
 - 🔎 **Static-analysis grounding** — auto-detects `checkov` or `tfsec`; degrades to
   AI-only if neither is present.
+- 📜 **Natural-language guardrails** — write org policy as plain English in
+  `guardrails.md`; the bot enforces it on every PR. No Rego, no Sentinel.
+- ✅ **Verified fixes, not guesses** — each proposed fix is applied to a scratch
+  copy and re-scanned to *prove* it resolves the finding (e.g. **25/32 resolved,
+  0 introduced** on the bundled example) before it's suggested.
 - 🧠 **Plain-English review** — every finding gets a *why it matters*, *blast
   radius*, *recommendation*, and a copy-pasteable **suggested fix**.
 - 💰 **Cost awareness (FinOps)** — flags changes that move cloud spend and estimates
@@ -176,6 +206,9 @@ terrasentinel ./infra --format markdown --fail-on high
 | `--no-scan` | Skip the scanner; let the AI review the code directly |
 | `--scanner checkov\|tfsec` | Force a specific scanner |
 | `--model NAME` | Claude model id (default `claude-opus-4-8`) |
+| `--guardrails PATH` | Enforce a plain-English policy file (auto-detects `guardrails.md`) |
+| `--verify-fixes` | Generate fixes and re-scan to prove they resolve findings |
+| `--fix` | Like `--verify-fixes`, but also write the corrected files to disk |
 | `--format text\|markdown\|json` | Output format for stdout |
 | `--output FILE` | Write the markdown report to a file |
 | `--post-pr` | Post/update the review comment on the GitHub PR |

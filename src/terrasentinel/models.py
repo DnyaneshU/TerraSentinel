@@ -74,6 +74,13 @@ class Finding(BaseModel):
     related_check_id: str | None = Field(
         default=None, description="The scanner check_id this maps to, if any"
     )
+    guardrail: str | None = Field(
+        default=None,
+        description="The plain-English team guardrail this finding violates, if any",
+    )
+    # Set by the verification step, not the model: True if a re-scan confirmed the
+    # fix resolves the related scanner check; False if it didn't; None if not checked.
+    fix_verified: bool | None = None
 
 
 class Review(BaseModel):

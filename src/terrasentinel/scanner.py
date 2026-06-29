@@ -53,7 +53,10 @@ def run_scanner(
 
     target = Path(path)
     if scanner in ("checkov", "checkov-module"):
-        return ("checkov", _run_checkov(target, use_module=scanner == "checkov-module"))
+        # Use the module runner if explicitly requested, or if the console script
+        # isn't on PATH (common on Windows venvs) but the package is importable.
+        use_module = scanner == "checkov-module" or shutil.which("checkov") is None
+        return ("checkov", _run_checkov(target, use_module=use_module))
     if scanner == "tfsec":
         return ("tfsec", _run_tfsec(target))
     raise ValueError(f"Unknown scanner: {scanner}")

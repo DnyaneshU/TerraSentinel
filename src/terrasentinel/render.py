@@ -35,7 +35,12 @@ _VERDICT_LABEL = {
 # --------------------------------------------------------------------------- #
 # Terminal (rich)
 # --------------------------------------------------------------------------- #
-def print_review(review: Review, scanner_name: str | None, console: Console | None = None) -> None:
+def print_review(
+    review: Review,
+    scanner_name: str | None,
+    console: Console | None = None,
+    verification: object | None = None,
+) -> None:
     console = console or Console()
     score = review.clamped_risk()
     header = (
@@ -44,6 +49,8 @@ def print_review(review: Review, scanner_name: str | None, console: Console | No
     )
     console.print(Panel(f"{review.summary}\n\n{header}", title="TerraSentinel review", expand=False))
     console.print(f"[bold]Cost impact:[/bold] {review.cost_impact}")
+    if verification is not None:
+        console.print(f"[bold]🔧 Verified fixes:[/bold] {_verification_summary(verification)}")
 
     if not review.findings:
         console.print("\n[green]No findings. Looks clean.[/green]")
@@ -54,23 +61,27 @@ def print_review(review: Review, scanner_name: str | None, console: Console | No
     table.add_column("Sev", no_wrap=True)
     table.add_column("Title")
     table.add_column("Location", no_wrap=True)
+    table.add_column("Fix", no_wrap=True)
     table.add_column("Why it matters")
     for f in _sorted(review.findings):
         sev = f.severity.value
+        title = ("📜 " if f.guardrail else "") + f.title
         table.add_row(
             f"[{_SEV_STYLE.get(sev, '')}]{_SEV_EMOJI.get(sev, '')} {sev}[/]",
-            f.title,
+            title,
             _loc(f.file, f.line),
+            _fix_badge_markup(f),
             f.explanation,
         )
     console.print(table)
 
     for f in _sorted(review.findings):
         if f.suggested_fix:
+            verified = " [green](✓ verified)[/]" if f.fix_verified else ""
             console.print(
                 Panel(
                     f.suggested_fix,
-                    title=f"Suggested fix — {f.title} ({_loc(f.file, f.line)})",
+                    title=f"Suggested fix{verified} — {f.title} ({_loc(f.file, f.line)})",
                     border_style="green",
                     expand=False,
                 )
@@ -106,7 +117,9 @@ def print_static_findings(
 # --------------------------------------------------------------------------- #
 # Markdown (GitHub)
 # --------------------------------------------------------------------------- #
-def review_to_markdown(review: Review, scanner_name: str | None) -> str:
+def review_to_markdown(
+    review: Review, scanner_name: str | None, verification: object | None = None
+) -> str:
     score = review.clamped_risk()
     lines = [
         COMMENT_MARKER,
@@ -118,20 +131,25 @@ def review_to_markdown(review: Review, scanner_name: str | None) -> str:
         review.summary,
         "",
         f"**💰 Cost impact:** {review.cost_impact}",
-        "",
     ]
+    if verification is not None:
+        lines.append("")
+        lines.append(f"**🔧 Verified fixes:** {_verification_summary(verification)}")
+    lines.append("")
+
     if not review.findings:
         lines.append("✅ **No findings.** This change looks clean.")
     else:
         lines.append(f"### Findings ({len(review.findings)})")
         lines.append("")
-        lines.append("| Severity | Title | Location | Category |")
-        lines.append("|---|---|---|---|")
+        lines.append("| Severity | Title | Location | Fix | Category |")
+        lines.append("|---|---|---|---|---|")
         for f in _sorted(review.findings):
             sev = f.severity.value
+            title = ("📜 " if f.guardrail else "") + _md(f.title)
             lines.append(
-                f"| {_SEV_EMOJI.get(sev, '')} {sev} | {_md(f.title)} | "
-                f"`{_loc(f.file, f.line)}` | {f.category} |"
+                f"| {_SEV_EMOJI.get(sev, '')} {sev} | {title} | "
+                f"`{_loc(f.file, f.line)}` | {_fix_badge_md(f)} | {f.category} |"
             )
         lines.append("")
         for f in _sorted(review.findings):
@@ -176,8 +194,11 @@ def _finding_detail_md(f: Finding) -> list[str]:
         "",
         f"**Recommendation:** {f.recommendation}",
     ]
+    if f.guardrail:
+        out += ["", f"**📜 Violates guardrail:** {f.guardrail}"]
     if f.suggested_fix:
-        out += ["", "**Suggested fix:**", "", "```hcl", f.suggested_fix, "```"]
+        label = "**Suggested fix** (✅ verified by re-scan):" if f.fix_verified else "**Suggested fix:**"
+        out += ["", label, "", "```hcl", f.suggested_fix, "```"]
     if f.related_check_id:
         out += ["", f"<sub>scanner check: `{f.related_check_id}`</sub>"]
     out += ["", "</details>", ""]
@@ -216,6 +237,29 @@ def _score_bar(score: int) -> str:
 def _footer_text(scanner_name: str | None) -> str:
     grounding = f"grounded by {scanner_name}" if scanner_name else "AI-only (no scanner found)"
     return f"Generated by TerraSentinel - {grounding}"
+
+
+def _fix_badge_markup(f: Finding) -> str:
+    if f.fix_verified is True:
+        return "[green]✓ verified[/]"
+    if f.fix_verified is False:
+        return "[red]✗ unverified[/]"
+    return "[dim]proposed[/]" if f.suggested_fix else ""
+
+
+def _fix_badge_md(f: Finding) -> str:
+    if f.fix_verified is True:
+        return "✅ verified"
+    if f.fix_verified is False:
+        return "⚠️ unverified"
+    return "proposed" if f.suggested_fix else "—"
+
+
+def _verification_summary(v: object) -> str:
+    return (
+        f"resolved {v.resolved_count}/{v.before} scanner findings, "
+        f"introduced {v.introduced_count} new (re-scanned)"
+    )
 
 
 def _print_footer(console: Console, scanner_name: str | None) -> None:
