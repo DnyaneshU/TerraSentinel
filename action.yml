@@ -33,6 +33,10 @@ inputs:
     description: "Generate fixes and re-scan to confirm they resolve findings (needs API key)."
     required: false
     default: "false"
+  sarif:
+    description: "Also emit SARIF and upload to GitHub code scanning (needs security-events: write)."
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -59,12 +63,20 @@ runs:
         TS_SCAN_ONLY: ${{ inputs.scan-only }}
         TS_BASE_REF: ${{ inputs.base-ref }}
         TS_VERIFY_FIXES: ${{ inputs.verify-fixes }}
+        TS_SARIF: ${{ inputs.sarif }}
       run: |
         set -euo pipefail
         args=(--diff --post-pr --fail-on "$TS_FAIL_ON" --model "$TS_MODEL")
         if [ "$TS_SCAN_ONLY" = "true" ]; then args+=(--scan-only); fi
         if [ "$TS_VERIFY_FIXES" = "true" ]; then args+=(--verify-fixes); fi
+        if [ "$TS_SARIF" = "true" ]; then args+=(--sarif terrasentinel.sarif); fi
         base="$TS_BASE_REF"
         if [ -z "$base" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then base="origin/$GITHUB_BASE_REF"; fi
         if [ -n "$base" ]; then args+=(--base "$base"); fi
         terrasentinel "${args[@]}"
+
+    - name: Upload SARIF to code scanning
+      if: ${{ always() && inputs.sarif == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: terrasentinel.sarif

@@ -162,6 +162,8 @@ like this (illustrative):
 - 🧰 **Configurable & multi-framework** — a `.terrasentinel.yml` sets model / severity /
   frameworks / ignores; scans **Terraform, Kubernetes, CloudFormation** and more (via
   checkov), and lets you **suppress** accepted findings by check id.
+- 🔐 **GitHub code scanning** — `--sarif` emits SARIF 2.1.0; the Action can upload it so
+  findings appear in the repo's **Security tab** and as inline annotations.
 
 ## Quick start (local)
 
@@ -216,6 +218,7 @@ terrasentinel ./infra --format markdown --fail-on high
 | `--fix` | Like `--verify-fixes`, but also write the corrected files to disk |
 | `--format text\|markdown\|json` | Output format for stdout |
 | `--output FILE` | Write the markdown report to a file |
+| `--sarif PATH` | Write findings as SARIF 2.1.0 for GitHub code scanning (Security tab) |
 | `--post-pr` | Post/update the review comment on the GitHub PR |
 | `--fail-on critical\|high\|medium\|low\|none` | Exit non-zero at/above this severity (default `high`) |
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -89,6 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     out.add_argument("--output", help="Write the markdown report to this file.")
     out.add_argument(
+        "--sarif", metavar="PATH", help="Write findings as SARIF 2.1.0 (for GitHub code scanning)."
+    )
+    out.add_argument(
         "--post-pr", action="store_true", help="Post/update a comment on the GitHub PR (CI use)."
     )
     out.add_argument(
@@ -173,6 +177,10 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
             render.print_static_findings(static_findings, scanner_name, console)
         markdown = render.static_findings_to_markdown(static_findings, scanner_name)
         _emit_side_outputs(args, markdown, err)
+        if args.sarif:
+            from .sarif import static_findings_to_sarif
+
+            _write_sarif(args.sarif, static_findings_to_sarif(static_findings), err)
         return _gate_static(static_findings, fail_on)
 
     # 3b. Full AI review (with optional plain-English guardrails).
@@ -207,6 +215,10 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
 
     markdown = render.review_to_markdown(result, scanner_name, verification)
     _emit_side_outputs(args, markdown, err)
+    if args.sarif:
+        from .sarif import review_to_sarif
+
+        _write_sarif(args.sarif, review_to_sarif(result), err)
     return _gate_review(result, fail_on)
 
 
@@ -223,6 +235,14 @@ def _emit_side_outputs(args: argparse.Namespace, markdown: str, err: Console) ->
             err.print(f"[green]Posted review to PR #{pr}:[/green] {url}")
         except GitHubError as e:
             err.print(f"[red]Could not post PR comment:[/red] {e}")
+
+
+def _write_sarif(path: str, doc: dict, err: Console) -> None:
+    p = Path(path)
+    if p.parent and not p.parent.exists():
+        p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    err.print(f"[dim]Wrote SARIF to {path}[/dim]")
 
 
 def _run_verification(
