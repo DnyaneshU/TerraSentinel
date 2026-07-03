@@ -12,6 +12,11 @@ re-scanning** before suggesting it.
 > matters here*, *what the blast radius is*, *what it costs*, and *how to fix it*.
 > TerraSentinel does the second part automatically, on top of the first.
 
+> **Status:** the static-analysis core — scan, SARIF, CI gate, config, and
+> suppressions — is verified and released. The **AI review, verified-fixes, and the
+> `adopt` prototype are beta**: they're implemented and unit-tested, but validate them
+> with your own Anthropic key before relying on them in production.
+
 ---
 
 ## The problem it solves
