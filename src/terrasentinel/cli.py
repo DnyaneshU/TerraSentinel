@@ -57,6 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-scan", action="store_true", help="Skip static analysis; AI reviews the code directly."
     )
     behavior.add_argument("--scanner", choices=["checkov", "tfsec"], help="Force a specific scanner.")
+    behavior.add_argument(
+        "--framework",
+        action="append",
+        metavar="NAME",
+        help="IaC framework(s) to scan: terraform (default), kubernetes, cloudformation, "
+        "serverless, … Repeatable or comma-separated.",
+    )
+    behavior.add_argument("--config", help="Path to a .terrasentinel.yml config file.")
     behavior.add_argument("--model", help="Claude model id (default: claude-opus-4-8).")
     behavior.add_argument(
         "--guardrails",
@@ -86,8 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument(
         "--fail-on",
         choices=_FAIL_ON_CHOICES,
-        default="high",
-        help="Exit non-zero if findings reach this severity (default: high).",
+        default=None,
+        help="Exit non-zero if findings reach this severity (default: high, or config).",
     )
     return p
 
@@ -108,7 +116,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
-    settings = load_settings(model_override=args.model)
+    settings = load_settings(config_path=args.config, target=args.path, model_override=args.model)
+    if settings.config_path:
+        err.print(f"[dim]Using config {settings.config_path}.[/dim]")
+    # Resolve precedence: explicit CLI flag > config/env > default.
+    fail_on = args.fail_on or settings.fail_on
+    frameworks = _resolve_frameworks(args.framework) or settings.frameworks
+    ignore = set(settings.ignore)
 
     # 1. Determine targets + collect material.
     diff_text: str | None = None
@@ -140,12 +154,14 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
             err.print("[yellow]No scanner (checkov/tfsec) found — running AI-only.[/yellow]")
         else:
             for target in scan_targets:
-                name, fs = run_scanner(target, args.scanner)
+                name, fs = run_scanner(target, args.scanner, frameworks)
                 scanner_name = name or scanner_name
                 static_findings.extend(fs)
             if changed is not None:
                 static_findings = [f for f in static_findings if matches_changed(f.file, changed)]
             static_findings = _dedupe(static_findings)
+            if ignore:  # suppress accepted findings (from config `ignore:`)
+                static_findings = [f for f in static_findings if f.check_id not in ignore]
 
     # 3a. Scan-only mode: report static findings and gate.
     if args.scan_only:
@@ -157,7 +173,7 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
             render.print_static_findings(static_findings, scanner_name, console)
         markdown = render.static_findings_to_markdown(static_findings, scanner_name)
         _emit_side_outputs(args, markdown, err)
-        return _gate_static(static_findings, args.fail_on)
+        return _gate_static(static_findings, fail_on)
 
     # 3b. Full AI review (with optional plain-English guardrails).
     gr_path, guardrails = load_guardrails(args.path, args.guardrails)
@@ -172,6 +188,8 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
         static_findings=static_findings,
         guardrails=guardrails,
     )
+    if ignore:  # apply suppressions to AI findings too
+        result.findings = [f for f in result.findings if f.related_check_id not in ignore]
 
     # Verified fixes: propose corrected files, then re-scan to prove they work.
     verification = None
@@ -189,7 +207,7 @@ def _run(args: argparse.Namespace, console: Console, err: Console) -> int:
 
     markdown = render.review_to_markdown(result, scanner_name, verification)
     _emit_side_outputs(args, markdown, err)
-    return _gate_review(result, args.fail_on)
+    return _gate_review(result, fail_on)
 
 
 def _emit_side_outputs(args: argparse.Namespace, markdown: str, err: Console) -> None:
@@ -260,6 +278,16 @@ def _apply_fixes(
         except OSError as e:
             err.print(f"[yellow]Could not write {target}: {e}[/yellow]")
     return written
+
+
+def _resolve_frameworks(values: list[str] | None) -> list[str] | None:
+    """Flatten repeated and comma-separated --framework values into a list."""
+    if not values:
+        return None
+    out: list[str] = []
+    for v in values:
+        out.extend(part.strip() for part in v.split(",") if part.strip())
+    return out or None
 
 
 def _gate_static(findings: list[StaticFinding], fail_on: str) -> int:

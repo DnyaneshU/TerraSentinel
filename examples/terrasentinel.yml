@@ -1,0 +1,22 @@
+# TerraSentinel configuration.
+# Copy this to your repository root as `.terrasentinel.yml` (note the leading dot).
+# Precedence: an explicit CLI flag always wins over this file, which wins over defaults.
+
+# Claude model. Use claude-sonnet-4-6 / claude-haiku-4-5 for cheaper CI runs.
+model: claude-opus-4-8
+
+# Fail the CI check when a finding reaches this severity:
+# critical | high | medium | low | none
+fail_on: high
+
+# Which IaC frameworks to scan (checkov frameworks). Terraform is the default.
+frameworks:
+  - terraform
+  # - kubernetes
+  # - cloudformation
+  # - serverless
+
+# Suppress accepted findings / false positives by their scanner check id.
+ignore:
+  # - CKV_AWS_18    # access logging handled centrally
+  # - CKV_AWS_144   # cross-region replication not required here

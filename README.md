@@ -159,6 +159,9 @@ like this (illustrative):
 - 🖥️ **Great local UX** — rich terminal output, plus `--scan-only` to run with no
   API key and no cost.
 - 🔁 **Model-configurable** — Opus 4.8 by default; drop to Sonnet/Haiku for scale.
+- 🧰 **Configurable & multi-framework** — a `.terrasentinel.yml` sets model / severity /
+  frameworks / ignores; scans **Terraform, Kubernetes, CloudFormation** and more (via
+  checkov), and lets you **suppress** accepted findings by check id.
 
 ## Quick start (local)
 
@@ -206,6 +209,8 @@ terrasentinel ./infra --format markdown --fail-on high
 | `--no-scan` | Skip the scanner; let the AI review the code directly |
 | `--scanner checkov\|tfsec` | Force a specific scanner |
 | `--model NAME` | Claude model id (default `claude-opus-4-8`) |
+| `--framework NAME` | Framework(s) to scan: terraform, kubernetes, cloudformation… (repeatable/comma-separated) |
+| `--config PATH` | Path to a `.terrasentinel.yml` (auto-detected otherwise) |
 | `--guardrails PATH` | Enforce a plain-English policy file (auto-detects `guardrails.md`) |
 | `--verify-fixes` | Generate fixes and re-scan to prove they resolve findings |
 | `--fix` | Like `--verify-fixes`, but also write the corrected files to disk |
@@ -257,6 +262,19 @@ Set via environment or a local `.env` (see [`.env.example`](.env.example)):
 | `TERRASENTINEL_MODEL` | Override the model (`claude-sonnet-4-6`, `claude-haiku-4-5`, …) |
 | `TERRASENTINEL_MAX_TOKENS` | Max output tokens (default 8000) |
 | `GITHUB_TOKEN` / `GITHUB_REPOSITORY` / `GITHUB_PR_NUMBER` | For `--post-pr` (the Action sets these automatically) |
+
+### Config file (`.terrasentinel.yml`)
+
+Drop a `.terrasentinel.yml` in your repo root for project defaults (any CLI flag
+overrides it). Full sample: [`examples/terrasentinel.yml`](examples/terrasentinel.yml).
+
+```yaml
+model: claude-opus-4-8
+fail_on: high
+frameworks: [terraform, kubernetes, cloudformation]
+ignore:
+  - CKV_AWS_18   # suppress accepted findings / false positives by check id
+```
 
 ## Cost
 

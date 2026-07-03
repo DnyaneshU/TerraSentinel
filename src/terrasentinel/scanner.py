@@ -40,25 +40,29 @@ def detect_scanner() -> str | None:
 
 
 def run_scanner(
-    path: str | Path, scanner: str | None = None
+    path: str | Path,
+    scanner: str | None = None,
+    frameworks: list[str] | None = None,
 ) -> tuple[str | None, list[StaticFinding]]:
     """Run the chosen (or auto-detected) scanner against *path*.
 
     Returns (scanner_name_used, findings). scanner_name_used is None when no
-    scanner is available.
+    scanner is available. `frameworks` selects checkov frameworks (terraform,
+    kubernetes, cloudformation, …); defaults to Terraform only.
     """
     scanner = scanner or detect_scanner()
     if scanner is None:
         return None, []
 
+    frameworks = frameworks or ["terraform"]
     target = Path(path)
     if scanner in ("checkov", "checkov-module"):
         # Use the module runner if explicitly requested, or if the console script
         # isn't on PATH (common on Windows venvs) but the package is importable.
         use_module = scanner == "checkov-module" or shutil.which("checkov") is None
-        return ("checkov", _run_checkov(target, use_module=use_module))
+        return ("checkov", _run_checkov(target, use_module=use_module, frameworks=frameworks))
     if scanner == "tfsec":
-        return ("tfsec", _run_tfsec(target))
+        return ("tfsec", _run_tfsec(target))  # tfsec is Terraform-only
     raise ValueError(f"Unknown scanner: {scanner}")
 
 
@@ -73,10 +77,13 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _run_checkov(target: Path, use_module: bool) -> list[StaticFinding]:
+def _run_checkov(target: Path, use_module: bool, frameworks: list[str]) -> list[StaticFinding]:
     base = [sys.executable, "-m", "checkov.main"] if use_module else ["checkov"]
     mode = ["-f", str(target)] if target.is_file() else ["-d", str(target)]
-    cmd = [*base, *mode, "-o", "json", "--compact", "--quiet", "--framework", "terraform"]
+    fw_args: list[str] = []
+    for fw in frameworks:
+        fw_args += ["--framework", fw]
+    cmd = [*base, *mode, "-o", "json", "--compact", "--quiet", *fw_args]
 
     # checkov exits non-zero when it finds failed checks — that is success for us.
     proc = _run(cmd)
