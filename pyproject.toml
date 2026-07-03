@@ -38,6 +38,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 terrasentinel = "terrasentinel.cli:main"
+terrasentinel-adopt = "terrasentinel.adopt:main"
 
 [project.urls]
 Homepage = "https://github.com/DnyaneshU/TerraSentinel"

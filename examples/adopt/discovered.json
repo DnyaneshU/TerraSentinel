@@ -1,0 +1,35 @@
+[
+  {
+    "type": "aws_s3_bucket",
+    "id": "my-company-customer-data",
+    "attributes": {
+      "bucket": "my-company-customer-data",
+      "tags": { "Environment": "prod", "Owner": "data-team" }
+    }
+  },
+  {
+    "type": "aws_s3_bucket_versioning",
+    "id": "my-company-customer-data",
+    "attributes": { "bucket": "my-company-customer-data", "status": "Enabled" }
+  },
+  {
+    "type": "aws_security_group",
+    "id": "sg-0abc123def456",
+    "attributes": {
+      "name": "web-sg",
+      "description": "Allow HTTPS from the corporate network",
+      "vpc_id": "vpc-0aa11bb22cc33",
+      "ingress": [
+        { "from_port": 443, "to_port": 443, "protocol": "tcp", "cidr_blocks": ["10.0.0.0/8"] }
+      ]
+    }
+  },
+  {
+    "type": "aws_iam_role",
+    "id": "app-runner-role",
+    "attributes": {
+      "name": "app-runner-role",
+      "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+    }
+  }
+]
